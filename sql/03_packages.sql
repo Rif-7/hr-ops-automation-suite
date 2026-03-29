@@ -114,8 +114,12 @@ IS
     ) IS
         v_emp_id NUMBER;
         v_count NUMBER;
+        v_error_key VARCHAR2(100) := 'NA';
+        v_error_msg VARCHAR2(200) := 'NA';
     BEGIN
         IF FN_IS_VALID_EMAIL(p_email) = 0 THEN
+            v_error_key := p_email;
+            v_error_msg := 'Invalid email';
             RAISE pkg_error.ex_invalid_email;
         END IF;
 
@@ -124,10 +128,14 @@ IS
         WHERE dept_id = p_dept_id;
 
         IF v_count = 0 THEN
+            v_error_key := to_char(p_dept_id);
+            v_error_msg := 'Department ID not found';
             RAISE pkg_error.ex_dept_not_found;
         END IF;
 
         IF p_salary < 0 THEN
+            v_error_key := to_char(p_salary);
+            v_error_msg := 'Invalid salary';
             RAISE pkg_error.ex_invalid_salary;
         END IF;
 
@@ -166,7 +174,13 @@ IS
     EXCEPTION
         WHEN OTHERS THEN
             ROLLBACK;
-            DBMS_OUTPUT.PUT_LINE('Onboarding failed: ' || SQLERRM);
+            pkg_error.pr_log_error(
+                'pr_onboard_employee',
+                v_error_key,
+                SQLCODE,
+                v_error_msg
+            );
+            DBMS_OUTPUT.PUT_LINE('Onboarding failed: ' || v_error_msg);
             RAISE;
     END;
 
@@ -260,6 +274,12 @@ IS
             IF c_emp%ISOPEN THEN
                 CLOSE c_emp;
             END IF;
+            pkg_error.pr_log_error(
+                'pr_generate_payroll',
+                to_char(p_month),
+                SQLCODE,
+                SQLERRM
+            );
             RAISE;
     END;
 
@@ -273,6 +293,8 @@ IS
     IS
         v_from_dept cs_employees.dept_id%TYPE;
         v_count     NUMBER;
+        v_error_key VARCHAR2(100) := 'NA';
+        v_error_msg VARCHAR2(200) := 'NA';
     BEGIN
         SELECT dept_id
         INTO v_from_dept
@@ -285,6 +307,8 @@ IS
         WHERE dept_id = p_to_dept_id;
 
         IF v_count = 0 THEN
+            v_error_key := to_char(p_to_dept_id);
+            v_error_msg := 'Target department does not exist';
             RAISE pkg_error.ex_target_dept_not_found;
         END IF;
 
@@ -312,7 +336,21 @@ IS
 
     EXCEPTION
         WHEN NO_DATA_FOUND THEN
+            pkg_error.pr_log_error(
+                'pr_transfer_employee',
+                to_char(p_emp_id),
+                SQLCODE,
+                'Employee not found'
+            );
             RAISE pkg_error.ex_employee_not_found;
+        WHEN OTHERS THEN
+            pkg_error.pr_log_error(
+                'pr_transfer_employee',
+                v_error_key,
+                SQLCODE,
+                v_error_msg
+            );
+            RAISE;
     END;
 
     PROCEDURE pr_upload_doc(
@@ -324,6 +362,8 @@ IS
     )
     IS
         v_count NUMBER;
+        v_error_key VARCHAR2(100) := 'NA';
+        v_error_msg VARCHAR2(200) := 'NA';
     BEGIN
         SELECT COUNT(*)
         INTO v_count
@@ -331,6 +371,8 @@ IS
         WHERE emp_id = p_emp_id;
 
         IF v_count = 0 THEN
+            v_error_key := to_char(p_emp_id);
+            v_error_msg := 'Employee not found';
             RAISE pkg_error.ex_employee_not_found;
         END IF;
 
@@ -350,6 +392,16 @@ IS
         );
 
         DBMS_OUTPUT.PUT_LINE('Document uploaded');
+
+    EXCEPTION
+        WHEN OTHERS THEN
+            pkg_error.pr_log_error(
+                'pr_upload_doc',
+                v_error_key,
+                SQLCODE,
+                v_error_msg
+            );
+            RAISE;
     END;
 
 
@@ -387,6 +439,12 @@ IS
 
     EXCEPTION
         WHEN NO_DATA_FOUND THEN
+            pkg_error.pr_log_error(
+                'fn_employee_summary',
+                to_char(p_emp_id),
+                SQLCODE,
+                'Employee not found'
+            );
             RETURN '{"error":"employee not found"}';
     END;
 
@@ -397,7 +455,8 @@ END pkg_hr_ops;
 -- Milestone E
 
 -- E1
-CREATE OR REPLACE PACKAGE pkg_error IS
+CREATE OR REPLACE PACKAGE pkg_error 
+IS
 
     ex_invalid_email EXCEPTION;
     ex_dept_not_found EXCEPTION;
@@ -411,5 +470,48 @@ CREATE OR REPLACE PACKAGE pkg_error IS
     PRAGMA EXCEPTION_INIT(ex_target_dept_not_found, -20010);
     PRAGMA EXCEPTION_INIT(ex_employee_not_found, -20011);
 
+    PROCEDURE pr_log_error(
+        p_module   VARCHAR2,
+        p_key      VARCHAR2,
+        p_err_code NUMBER,
+        p_err_msg  VARCHAR2
+    );
+
 END pkg_error;
 /
+
+CREATE OR REPLACE PACKAGE BODY pkg_error 
+IS
+    PROCEDURE pr_log_error(
+        p_module   VARCHAR2,
+        p_key      VARCHAR2,
+        p_err_code NUMBER,
+        p_err_msg  VARCHAR2
+    )
+    IS
+        PRAGMA AUTONOMOUS_TRANSACTION;
+    BEGIN
+        INSERT INTO cs_audit_log(
+            table_name,
+            action_type,
+            pk_value,
+            details
+        )
+        VALUES(
+            p_module,
+            'ERROR',
+            p_key,
+            'CODE=' || p_err_code || ' MSG=' || p_err_msg
+        );
+
+        COMMIT;
+    EXCEPTION
+        WHEN OTHERS THEN
+            dbms_output.put_line('Logger error code: ' || SQLCODE);
+            dbms_output.put_line('Logger error message: ' || SQLERRM);
+            ROLLBACK;
+    END;
+
+END pkg_error;
+/
+
