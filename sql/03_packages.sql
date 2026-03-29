@@ -76,6 +76,24 @@ IS
 
     PROCEDURE pr_generate_payroll(p_month IN DATE);
 
+    PROCEDURE pr_transfer_employee(
+        p_emp_id IN cs_employees.emp_id%TYPE,
+        p_to_dept_id IN cs_departments.dept_id%TYPE,
+        p_effective_on IN cs_transfers.effective_on%TYPE,
+        p_reason IN cs_transfers.reason%TYPE
+    );
+
+    PROCEDURE pr_upload_doc(
+        p_emp_id IN cs_employees.emp_id%TYPE,
+        p_doc_type IN cs_employee_docs.doc_type%TYPE,
+        p_blob IN cs_employee_docs.doc_content%TYPE,
+        p_file_name IN cs_employee_docs.file_name%TYPE,
+        p_mime IN cs_employee_docs.mime_type%TYPE
+    );
+
+    FUNCTION fn_employee_summary(p_emp_id IN cs_employees.emp_id%TYPE) RETURN CLOB;
+
+
 END pkg_hr_ops;
 /
 
@@ -243,6 +261,133 @@ IS
                 CLOSE c_emp;
             END IF;
             RAISE;
+    END;
+
+
+    PROCEDURE pr_transfer_employee(
+        p_emp_id       IN cs_employees.emp_id%TYPE,
+        p_to_dept_id   IN cs_departments.dept_id%TYPE,
+        p_effective_on IN cs_transfers.effective_on%TYPE,
+        p_reason       IN cs_transfers.reason%TYPE
+    )
+    IS
+        v_from_dept cs_employees.dept_id%TYPE;
+        v_count     NUMBER;
+    BEGIN
+        SELECT dept_id
+        INTO v_from_dept
+        FROM cs_employees
+        WHERE emp_id = p_emp_id;
+
+        SELECT COUNT(*)
+        INTO v_count
+        FROM cs_departments
+        WHERE dept_id = p_to_dept_id;
+
+        IF v_count = 0 THEN
+            RAISE_APPLICATION_ERROR(-20010,'Target department does not exist');
+        END IF;
+
+        INSERT INTO cs_transfers(
+            emp_id,
+            from_dept_id,
+            to_dept_id,
+            effective_on,
+            reason
+        )
+        VALUES(
+            p_emp_id,
+            v_from_dept,
+            p_to_dept_id,
+            p_effective_on,
+            p_reason
+        );
+
+        UPDATE cs_employees
+        SET dept_id   = p_to_dept_id,
+            updated_at = SYSDATE
+        WHERE emp_id = p_emp_id;
+
+        DBMS_OUTPUT.PUT_LINE('Employee transferred');
+
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RAISE_APPLICATION_ERROR(-20011,'Employee not found');
+    END;
+
+    PROCEDURE pr_upload_doc(
+        p_emp_id    IN cs_employees.emp_id%TYPE,
+        p_doc_type  IN cs_employee_docs.doc_type%TYPE,
+        p_blob      IN cs_employee_docs.doc_content%TYPE,
+        p_file_name IN cs_employee_docs.file_name%TYPE,
+        p_mime      IN cs_employee_docs.mime_type%TYPE
+    )
+    IS
+        v_count NUMBER;
+    BEGIN
+        SELECT COUNT(*)
+        INTO v_count
+        FROM cs_employees
+        WHERE emp_id = p_emp_id;
+
+        IF v_count = 0 THEN
+            RAISE_APPLICATION_ERROR(-20020,'Employee not found');
+        END IF;
+
+        INSERT INTO cs_employee_docs(
+            emp_id,
+            doc_type,
+            file_name,
+            mime_type,
+            doc_content
+        )
+        VALUES(
+            p_emp_id,
+            p_doc_type,
+            p_file_name,
+            p_mime,
+            p_blob
+        );
+
+        DBMS_OUTPUT.PUT_LINE('Document uploaded');
+    END;
+
+
+    FUNCTION fn_employee_summary(
+        p_emp_id IN cs_employees.emp_id%TYPE
+    ) RETURN CLOB
+    IS
+        v_clob CLOB;
+        v_name VARCHAR2(200);
+        v_dept VARCHAR2(100);
+        v_salary NUMBER;
+    BEGIN
+        SELECT e.first_name || ' ' || e.last_name,
+               d.dept_name,
+               s.base_salary
+        INTO v_name,
+             v_dept,
+             v_salary
+        FROM cs_employees e
+        JOIN cs_departments d
+            ON e.dept_id = d.dept_id
+        LEFT JOIN cs_employee_salary s
+            ON e.emp_id = s.emp_id
+        WHERE e.emp_id = p_emp_id;
+
+        v_clob :=
+            '{' ||
+            '"emp_id": ' || p_emp_id || ',' ||
+            '"name": "' || v_name || '",' ||
+            '"department": "' || v_dept || '",' ||
+            '"salary": ' || NVL(v_salary,0) ||
+            '}';
+
+        RETURN v_clob;
+
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RETURN '{"error":"employee not found"}';
     END;
 
 END pkg_hr_ops;
