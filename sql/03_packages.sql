@@ -116,7 +116,7 @@ IS
         v_count NUMBER;
     BEGIN
         IF FN_IS_VALID_EMAIL(p_email) = 0 THEN
-            RAISE_APPLICATION_ERROR(-20001, 'Invalid Email');
+            RAISE pkg_error.ex_invalid_email;
         END IF;
 
         SELECT COUNT(*) INTO v_count
@@ -124,11 +124,11 @@ IS
         WHERE dept_id = p_dept_id;
 
         IF v_count = 0 THEN
-            RAISE_APPLICATION_ERROR(-20002, 'Department does not exist');
+            RAISE pkg_error.ex_dept_not_found;
         END IF;
 
         IF p_salary < 0 THEN
-            RAISE_APPLICATION_ERROR(-20003, 'Invalid Salary');
+            RAISE pkg_error.ex_invalid_salary;
         END IF;
 
         INSERT INTO cs_employees (
@@ -285,7 +285,7 @@ IS
         WHERE dept_id = p_to_dept_id;
 
         IF v_count = 0 THEN
-            RAISE_APPLICATION_ERROR(-20010,'Target department does not exist');
+            RAISE pkg_error.ex_target_dept_not_found;
         END IF;
 
         INSERT INTO cs_transfers(
@@ -312,7 +312,7 @@ IS
 
     EXCEPTION
         WHEN NO_DATA_FOUND THEN
-            RAISE_APPLICATION_ERROR(-20011,'Employee not found');
+            RAISE pkg_error.ex_employee_not_found;
     END;
 
     PROCEDURE pr_upload_doc(
@@ -331,7 +331,7 @@ IS
         WHERE emp_id = p_emp_id;
 
         IF v_count = 0 THEN
-            RAISE_APPLICATION_ERROR(-20020,'Employee not found');
+            RAISE pkg_error.ex_employee_not_found;
         END IF;
 
         INSERT INTO cs_employee_docs(
@@ -391,4 +391,25 @@ IS
     END;
 
 END pkg_hr_ops;
+/
+
+
+-- Milestone E
+
+-- E1
+CREATE OR REPLACE PACKAGE pkg_error IS
+
+    ex_invalid_email EXCEPTION;
+    ex_dept_not_found EXCEPTION;
+    ex_invalid_salary EXCEPTION;
+    ex_target_dept_not_found EXCEPTION;
+    ex_employee_not_found EXCEPTION;
+
+    PRAGMA EXCEPTION_INIT(ex_invalid_email, -20001);
+    PRAGMA EXCEPTION_INIT(ex_dept_not_found, -20002);
+    PRAGMA EXCEPTION_INIT(ex_invalid_salary, -20003);
+    PRAGMA EXCEPTION_INIT(ex_target_dept_not_found, -20010);
+    PRAGMA EXCEPTION_INIT(ex_employee_not_found, -20011);
+
+END pkg_error;
 /
