@@ -3,6 +3,62 @@ SET SERVEROUTPUT ON;
 
 -- HR OPS AUTOMATION SUITE Packages and Procedures
 
+
+-- Milestone D
+
+-- D1
+CREATE OR REPLACE FUNCTION fn_get_emp_fullname (
+    p_emp_id IN cs_employees.emp_id%TYPE
+)
+RETURN VARCHAR2
+IS
+    v_fullname VARCHAR2(200);
+BEGIN
+    SELECT first_name || ' ' || last_name
+    INTO v_fullname
+    FROM cs_employees
+    WHERE emp_id = p_emp_id;
+
+    RETURN v_fullname;
+
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        RETURN NULL;
+END;
+/
+
+
+CREATE OR REPLACE FUNCTION fn_compute_tax (
+    p_gross IN NUMBER
+)
+RETURN NUMBER
+IS
+    v_tax NUMBER;
+BEGIN
+    IF p_gross < 50000 THEN
+        v_tax := p_gross * 0.10;
+    ELSE
+        v_tax := p_gross * 0.20;
+    END IF;
+
+    RETURN v_tax;
+END;
+/
+
+CREATE OR REPLACE FUNCTION fn_is_valid_email (
+    p_email IN VARCHAR2
+)
+RETURN NUMBER
+IS
+BEGIN
+    IF INSTR(p_email, '@') > 0 THEN
+        RETURN 1;
+    ELSE
+        RETURN 0;
+    END IF;
+END;
+/
+
 -- Milestone B
 
 -- B1
@@ -19,7 +75,7 @@ CREATE OR REPLACE PROCEDURE pr_onboard_employee (
     v_emp_id NUMBER;
     v_count NUMBER;
 BEGIN
-    IF INSTR(p_email, '@') = 0 THEN
+    IF FN_IS_VALID_EMAIL(p_email) = 0 THEN
         RAISE_APPLICATION_ERROR(-20001, 'Invalid Email');
     END IF;
 
@@ -116,11 +172,8 @@ BEGIN
         BEGIN
             v_gross := v_rec.base_salary + v_rec.bonus;
 
-            IF v_gross < 50000 THEN
-                v_tax := v_gross * 0.10;
-            ELSE
-                v_tax := v_gross * 0.20;
-            END IF;
+            v_tax := FN_COMPUTE_TAX(v_gross);
+
 
             v_net := v_gross - v_tax;
 
@@ -155,9 +208,9 @@ BEGIN
     DBMS_OUTPUT.PUT_LINE('Failures: ' || v_fail_count);
 
     IF v_fail_count > 0 THEN
-        DBMS_OUTPUT.PUT_LINE('Failed employee IDs:');
+        DBMS_OUTPUT.PUT_LINE('Failed employees:');
         FOR i IN 1 .. v_fail_count LOOP
-            DBMS_OUTPUT.PUT_LINE(' - ' || v_failed(i));
+            DBMS_OUTPUT.PUT_LINE( v_failed(i) || ' - ' || FN_GET_EMP_FULLNAME(v_failed(i)));
         END LOOP;
     END IF;
 
@@ -171,3 +224,4 @@ EXCEPTION
         RAISE;
 END;
 /
+
