@@ -3,7 +3,9 @@ SET SERVEROUTPUT ON;
 
 -- HR OPS AUTOMATION SUITE Packages and Procedures
 
+-- Milestone B
 
+-- B1
 CREATE OR REPLACE PROCEDURE pr_onboard_employee (
     p_first_name   IN cs_employees.first_name%TYPE,
     p_last_name    IN cs_employees.last_name%TYPE,
@@ -73,4 +75,99 @@ EXCEPTION
 END;
 /
 
- 
+
+-- Milestone C
+
+-- C1
+ CREATE OR REPLACE PROCEDURE pr_generate_payroll (
+    p_month IN DATE
+)
+IS
+    TYPE t_emp_rec IS RECORD (
+        emp_id      cs_employees.emp_id%TYPE,
+        base_salary cs_employee_salary.base_salary%TYPE,
+        bonus       cs_employee_salary.bonus%TYPE
+    );
+
+    TYPE t_failed_tab IS TABLE OF NUMBER INDEX BY PLS_INTEGER;
+    v_failed t_failed_tab;
+    v_fail_count NUMBER := 0;
+
+    CURSOR c_emp IS
+        SELECT e.emp_id,
+               s.base_salary,
+               NVL(s.bonus,0) bonus
+        FROM cs_employees e
+        JOIN cs_employee_salary s
+          ON e.emp_id = s.emp_id;
+
+    v_rec   t_emp_rec;
+    v_gross NUMBER;
+    v_tax   NUMBER;
+    v_net   NUMBER;
+
+BEGIN
+    OPEN c_emp;
+
+    LOOP
+        FETCH c_emp INTO v_rec;
+        EXIT WHEN c_emp%NOTFOUND;
+
+        BEGIN
+            v_gross := v_rec.base_salary + v_rec.bonus;
+
+            IF v_gross < 50000 THEN
+                v_tax := v_gross * 0.10;
+            ELSE
+                v_tax := v_gross * 0.20;
+            END IF;
+
+            v_net := v_gross - v_tax;
+
+            INSERT INTO cs_payroll_snapshot (
+                snap_month,
+                emp_id,
+                gross_pay,
+                tax_amount,
+                net_pay
+            )
+            VALUES (
+                TRUNC(p_month, 'MM'),
+                v_rec.emp_id,
+                v_gross,
+                v_tax,
+                v_net
+            );
+
+        EXCEPTION
+            WHEN DUP_VAL_ON_INDEX THEN
+                v_fail_count := v_fail_count + 1;
+                v_failed(v_fail_count) := v_rec.emp_id;
+
+            WHEN OTHERS THEN
+                v_fail_count := v_fail_count + 1;
+                v_failed(v_fail_count) := v_rec.emp_id;
+        END;
+
+    END LOOP;
+
+    DBMS_OUTPUT.PUT_LINE('Processed rows: ' || c_emp%ROWCOUNT);
+    DBMS_OUTPUT.PUT_LINE('Failures: ' || v_fail_count);
+
+    IF v_fail_count > 0 THEN
+        DBMS_OUTPUT.PUT_LINE('Failed employee IDs:');
+        FOR i IN 1 .. v_fail_count LOOP
+            DBMS_OUTPUT.PUT_LINE(' - ' || v_failed(i));
+        END LOOP;
+    END IF;
+
+    CLOSE c_emp;
+
+EXCEPTION
+    WHEN OTHERS THEN
+        IF c_emp%ISOPEN THEN
+            CLOSE c_emp;
+        END IF;
+        RAISE;
+END;
+/
