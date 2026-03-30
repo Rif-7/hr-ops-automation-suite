@@ -4,6 +4,8 @@ SET SERVEROUTPUT ON;
 -- HR OPS AUTOMATION SUITE Packages and Procedures
 
 
+
+
 -- Milestone D
 
 -- D1
@@ -59,6 +61,74 @@ BEGIN
 END;
 /
 
+-- Milestone E
+
+-- E1
+CREATE OR REPLACE PACKAGE pkg_error 
+IS
+
+    ex_invalid_email EXCEPTION;
+    ex_dept_not_found EXCEPTION;
+    ex_invalid_salary EXCEPTION;
+    ex_target_dept_not_found EXCEPTION;
+    ex_employee_not_found EXCEPTION;
+    ex_invalid_filter_column EXCEPTION;
+    ex_invalid_sort_column   EXCEPTION;
+
+
+
+    PRAGMA EXCEPTION_INIT(ex_invalid_email, -20001);
+    PRAGMA EXCEPTION_INIT(ex_dept_not_found, -20002);
+    PRAGMA EXCEPTION_INIT(ex_invalid_salary, -20003);
+    PRAGMA EXCEPTION_INIT(ex_target_dept_not_found, -20010);
+    PRAGMA EXCEPTION_INIT(ex_employee_not_found, -20011);
+    PRAGMA EXCEPTION_INIT(ex_invalid_filter_column, -20020);
+    PRAGMA EXCEPTION_INIT(ex_invalid_sort_column, -20021);
+
+    PROCEDURE pr_log_error(
+        p_module   VARCHAR2,
+        p_key      VARCHAR2,
+        p_err_code NUMBER,
+        p_err_msg  VARCHAR2
+    );
+
+END pkg_error;
+/
+
+CREATE OR REPLACE PACKAGE BODY pkg_error 
+IS
+    PROCEDURE pr_log_error(
+        p_module   VARCHAR2,
+        p_key      VARCHAR2,
+        p_err_code NUMBER,
+        p_err_msg  VARCHAR2
+    )
+    IS
+        PRAGMA AUTONOMOUS_TRANSACTION;
+    BEGIN
+        INSERT INTO cs_audit_log(
+            table_name,
+            action_type,
+            pk_value,
+            details
+        )
+        VALUES(
+            p_module,
+            'ERROR',
+            p_key,
+            'CODE=' || p_err_code || ' MSG=' || p_err_msg
+        );
+
+        COMMIT;
+    EXCEPTION
+        WHEN OTHERS THEN
+            dbms_output.put_line('Logger error code: ' || SQLCODE);
+            dbms_output.put_line('Logger error message: ' || SQLERRM);
+            ROLLBACK;
+    END;
+
+END pkg_error;
+/
 
 -- D2
 CREATE OR REPLACE PACKAGE pkg_hr_ops
@@ -92,6 +162,14 @@ IS
     );
 
     FUNCTION fn_employee_summary(p_emp_id IN cs_employees.emp_id%TYPE) RETURN CLOB;
+
+    PROCEDURE pr_employee_report (
+        p_filter_col IN VARCHAR2,
+        p_filter_val IN VARCHAR2,
+        p_sort_col   IN VARCHAR2,
+        p_sort_dir   IN VARCHAR2,
+        p_out        OUT SYS_REFCURSOR
+    );
 
 
 END pkg_hr_ops;
@@ -448,70 +526,90 @@ IS
             RETURN '{"error":"employee not found"}';
     END;
 
-END pkg_hr_ops;
-/
+    -- Milestone G
 
-
--- Milestone E
-
--- E1
-CREATE OR REPLACE PACKAGE pkg_error 
-IS
-
-    ex_invalid_email EXCEPTION;
-    ex_dept_not_found EXCEPTION;
-    ex_invalid_salary EXCEPTION;
-    ex_target_dept_not_found EXCEPTION;
-    ex_employee_not_found EXCEPTION;
-
-    PRAGMA EXCEPTION_INIT(ex_invalid_email, -20001);
-    PRAGMA EXCEPTION_INIT(ex_dept_not_found, -20002);
-    PRAGMA EXCEPTION_INIT(ex_invalid_salary, -20003);
-    PRAGMA EXCEPTION_INIT(ex_target_dept_not_found, -20010);
-    PRAGMA EXCEPTION_INIT(ex_employee_not_found, -20011);
-
-    PROCEDURE pr_log_error(
-        p_module   VARCHAR2,
-        p_key      VARCHAR2,
-        p_err_code NUMBER,
-        p_err_msg  VARCHAR2
-    );
-
-END pkg_error;
-/
-
-CREATE OR REPLACE PACKAGE BODY pkg_error 
-IS
-    PROCEDURE pr_log_error(
-        p_module   VARCHAR2,
-        p_key      VARCHAR2,
-        p_err_code NUMBER,
-        p_err_msg  VARCHAR2
+    -- G1
+    PROCEDURE pr_employee_report (
+        p_filter_col IN VARCHAR2,
+        p_filter_val IN VARCHAR2,
+        p_sort_col   IN VARCHAR2,
+        p_sort_dir   IN VARCHAR2,
+        p_out        OUT SYS_REFCURSOR
     )
     IS
-        PRAGMA AUTONOMOUS_TRANSACTION;
-    BEGIN
-        INSERT INTO cs_audit_log(
-            table_name,
-            action_type,
-            pk_value,
-            details
-        )
-        VALUES(
-            p_module,
-            'ERROR',
-            p_key,
-            'CODE=' || p_err_code || ' MSG=' || p_err_msg
-        );
+        v_sql        VARCHAR2(4000);
+        v_filter_col VARCHAR2(30);
+        v_sort_col   VARCHAR2(30);
+        v_sort_dir   VARCHAR2(4);
 
-        COMMIT;
+        v_error_key VARCHAR2(100) := 'NA';
+        v_error_msg VARCHAR2(200) := 'NA';
+
+        FUNCTION is_valid_column(p_col VARCHAR2) RETURN BOOLEAN IS
+        BEGIN
+            RETURN UPPER(p_col) IN (
+                'EMP_ID',
+                'FIRST_NAME',
+                'LAST_NAME',
+                'EMAIL',
+                'DEPT_ID',
+                'JOB_TITLE',
+                'STATUS',
+                'MANAGER_ID'
+            );
+        END;
+
+    BEGIN
+        IF p_filter_col IS NOT NULL THEN
+            IF NOT is_valid_column(p_filter_col) THEN
+                v_error_key := p_filter_col;
+                v_error_msg := 'Invalid filter column';
+                RAISE pkg_error.ex_invalid_filter_column;
+            END IF;
+            v_filter_col := UPPER(p_filter_col);
+        END IF;
+
+        IF p_sort_col IS NOT NULL THEN
+            IF NOT is_valid_column(p_sort_col) THEN
+                v_error_key := p_sort_col;
+                v_error_msg := 'Invalid sort column';
+                RAISE pkg_error.ex_invalid_sort_column;
+            END IF;
+            v_sort_col := UPPER(p_sort_col);
+        ELSE
+            v_sort_col := 'EMP_ID';
+        END IF;
+
+        IF UPPER(p_sort_dir) NOT IN ('ASC','DESC') THEN
+            v_sort_dir := 'ASC';
+        ELSE
+            v_sort_dir := UPPER(p_sort_dir);
+        END IF;
+
+        v_sql := 'SELECT * FROM cs_employees WHERE 1=1';
+
+        IF v_filter_col IS NOT NULL THEN
+            v_sql := v_sql || ' AND ' || v_filter_col || ' = :1';
+        END IF;
+
+        v_sql := v_sql || ' ORDER BY ' || v_sort_col || ' ' || v_sort_dir;
+
+        IF v_filter_col IS NOT NULL THEN
+            OPEN p_out FOR v_sql USING p_filter_val;
+        ELSE
+            OPEN p_out FOR v_sql;
+        END IF;
+
     EXCEPTION
         WHEN OTHERS THEN
-            dbms_output.put_line('Logger error code: ' || SQLCODE);
-            dbms_output.put_line('Logger error message: ' || SQLERRM);
-            ROLLBACK;
+            pkg_error.pr_log_error(
+                'pr_employee_report',
+                v_error_key,
+                SQLCODE,
+                v_error_msg
+            );
+            RAISE;
     END;
 
-END pkg_error;
+END pkg_hr_ops;
 /
-
