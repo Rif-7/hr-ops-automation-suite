@@ -171,6 +171,14 @@ IS
         p_out        OUT SYS_REFCURSOR
     );
 
+    FUNCTION fn_get_doc_metadata (
+        p_doc_id IN cs_employee_docs.doc_id%TYPE
+    ) RETURN CLOB;
+
+    FUNCTION fn_get_doc_blob_summary (
+        p_doc_id IN cs_employee_docs.doc_id%TYPE
+    ) RETURN CLOB;
+
 
 END pkg_hr_ops;
 /
@@ -607,6 +615,87 @@ IS
                 v_error_key,
                 SQLCODE,
                 v_error_msg || ' | ' || SQLERRM
+            );
+            RAISE;
+    END;
+
+    -- Milestone I
+
+    -- I1
+    FUNCTION fn_get_doc_metadata (
+        p_doc_id IN cs_employee_docs.doc_id%TYPE
+    ) RETURN CLOB
+    IS
+        v_result   CLOB;
+        v_size     NUMBER;
+        v_error_key VARCHAR2(100) := 'NA';
+        v_error_msg VARCHAR2(200) := 'NA';
+
+        v_doc cs_employee_docs%ROWTYPE;
+    BEGIN
+        SELECT *
+        INTO v_doc
+        FROM cs_employee_docs
+        WHERE doc_id = p_doc_id;
+
+        v_size := DBMS_LOB.GETLENGTH(v_doc.doc_content);
+
+        v_result :=
+            'DOC_ID=' || v_doc.doc_id || CHR(10) ||
+            'EMP_ID=' || v_doc.emp_id || CHR(10) ||
+            'DOC_TYPE=' || v_doc.doc_type || CHR(10) ||
+            'FILE_NAME=' || v_doc.file_name || CHR(10) ||
+            'MIME_TYPE=' || v_doc.mime_type || CHR(10) ||
+            'SIZE=' || v_size || ' bytes' || CHR(10) ||
+            'UPLOADED_AT=' || v_doc.uploaded_at;
+
+        RETURN v_result;
+
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            v_error_key := TO_CHAR(p_doc_id);
+            v_error_msg := 'Document not found';
+            pkg_error.pr_log_error(
+                'fn_get_doc_metadata',
+                v_error_key,
+                SQLCODE,
+                v_error_msg
+            );
+            RAISE;
+    END;
+
+
+    FUNCTION fn_get_doc_blob_summary (
+        p_doc_id IN cs_employee_docs.doc_id%TYPE
+    ) RETURN CLOB
+    IS
+        v_blob    BLOB;
+        v_clob    CLOB;
+        v_raw     RAW(32767);
+
+        v_error_key VARCHAR2(100) := 'NA';
+        v_error_msg VARCHAR2(200) := 'NA';
+    BEGIN
+        SELECT doc_content
+        INTO v_blob
+        FROM cs_employee_docs
+        WHERE doc_id = p_doc_id;
+
+        v_raw := DBMS_LOB.SUBSTR(v_blob, 2000, 1);
+
+        v_clob := UTL_RAW.CAST_TO_VARCHAR2(v_raw);
+
+        RETURN v_clob;
+
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            v_error_key := TO_CHAR(p_doc_id);
+            v_error_msg := 'Document not found';
+            pkg_error.pr_log_error(
+                'fn_get_doc_blob_summary',
+                v_error_key,
+                SQLCODE,
+                v_error_msg
             );
             RAISE;
     END;
