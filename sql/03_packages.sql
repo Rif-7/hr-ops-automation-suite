@@ -256,7 +256,7 @@ IS
                 'pr_onboard_employee',
                 v_error_key,
                 SQLCODE,
-                v_error_msg
+                v_error_msg || ' | ' || SQLERRM
             );
             DBMS_OUTPUT.PUT_LINE('Onboarding failed: ' || v_error_msg);
             RAISE;
@@ -426,7 +426,7 @@ IS
                 'pr_transfer_employee',
                 v_error_key,
                 SQLCODE,
-                v_error_msg
+                v_error_msg || ' | ' || SQLERRM
             );
             RAISE;
     END;
@@ -477,7 +477,7 @@ IS
                 'pr_upload_doc',
                 v_error_key,
                 SQLCODE,
-                v_error_msg
+                v_error_msg || ' | ' || SQLERRM
             );
             RAISE;
     END;
@@ -606,7 +606,7 @@ IS
                 'pr_employee_report',
                 v_error_key,
                 SQLCODE,
-                v_error_msg
+                v_error_msg || ' | ' || SQLERRM
             );
             RAISE;
     END;
