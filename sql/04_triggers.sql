@@ -7,10 +7,12 @@ SET SERVEROUTPUT ON;
 -- F1
 CREATE OR REPLACE TRIGGER tr_cs_employees_bu
 BEFORE UPDATE ON cs_employees
+REFERENCING OLD AS old NEW AS new 
 FOR EACH ROW
 BEGIN
     :new.updated_at := SYSDATE;
-END;
+END tr_cs_employee_bu;
+/
 
 CREATE OR REPLACE TRIGGER tr_employees_audit_aiud
 AFTER INSERT OR UPDATE OR DELETE 
@@ -108,16 +110,17 @@ BEGIN
     END IF;
 
     
-END;
-
+END tr_employees_audit_aiud;
+/
 
 CREATE OR REPLACE TRIGGER tr_cs_employee_salary_bu
 BEFORE UPDATE ON cs_employee_salary
+REFERENCING OLD AS old NEW AS new 
 FOR EACH ROW
 BEGIN
     :new.updated_at := SYSDATE;
-END;
-
+END tr_cs_employee_salary_bu;
+/
 
 CREATE OR REPLACE TRIGGER tr_employee_salary_au
 AFTER UPDATE 
@@ -154,4 +157,5 @@ BEGIN
         v_details
     );
 
-END;
+END tr_cs_employee_salary_au;
+/
