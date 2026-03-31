@@ -702,3 +702,45 @@ IS
 
 END pkg_hr_ops;
 /
+
+CREATE OR REPLACE PACKAGE pkg_hr_security
+AUTHID DEFINER
+IS
+    PROCEDURE pr_set_login_context;
+END pkg_hr_security;    
+/
+
+CREATE OR REPLACE PACKAGE BODY pkg_hr_security
+AUTHID DEFINER
+IS
+    PROCEDURE pr_set_login_context
+    IS
+        l_emp_id NUMBER;
+        l_role VARCHAR2(20);
+    BEGIN
+        SELECT emp_id INTO l_emp_id
+        FROM cs_user_identity
+        WHERE db_username = USER;
+
+        IF DBMS_SESSION.IS_ROLE_ENABLED('ROLE_HR_ADMIN') THEN
+            l_role := 'HR_ADMIN';
+        ELSIF DBMS_SESSION.IS_ROLE_ENABLED('ROLE_MANAGER') THEN
+            l_role := 'HR_MANAGER';
+        ELSE
+            l_role := 'EMPLOYEE';
+        END IF;
+
+        
+        DBMS_SESSION.SET_CONTEXT('HR_CTX', 'EMP_ID', l_emp_id);
+        DBMS_SESSION.SET_CONTEXT('HR_CTX', 'ROLE_TYPE', l_role);
+
+
+    EXCEPTION 
+        WHEN NO_DATA_FOUND THEN
+            DBMS_SESSION.SET_CONTEXT('HR_CTX', 'ROLE_TYPE', 'NONE');
+    END;
+END pkg_hr_security;
+/
+
+GRANT EXECUTE ON pkg_hr_security TO role_hr_admin, role_manager, role_employee;
+/

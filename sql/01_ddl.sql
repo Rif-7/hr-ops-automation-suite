@@ -138,8 +138,32 @@ doc_content BLOB,
 uploaded_at DATE DEFAULT SYSDATE NOT NULL
 );
 
+
+-- User Identity
+CREATE TABLE cs_user_identity (
+    db_username VARCHAR2(30) PRIMARY KEY,
+    emp_id      NUMBER 
+); 
+
 -- Indexes 
 CREATE INDEX idx_emp_dept ON cs_employees(dept_id);
 CREATE INDEX idx_payroll_emp ON cs_payroll_snapshot(emp_id);
 CREATE INDEX idx_transfers_emp ON cs_transfers(emp_id);
 
+
+-- Roles
+
+-- HR ADMIN
+CREATE ROLE role_hr_admin;
+GRANT SELECT, INSERT, UPDATE, DELETE ON cs_employee_salary TO role_hr_admin;
+
+-- MANAGER
+CREATE ROLE role_manager;
+GRANT SELECT ON cs_employee_salary TO role_manager;
+
+-- EMPLOYEE
+CREATE ROLE role_employee;
+GRANT SELECT ON cs_employee_salary TO role_employee;
+
+-- HR Context
+CREATE CONTEXT hr_ctx USING pkg_hr_security;
