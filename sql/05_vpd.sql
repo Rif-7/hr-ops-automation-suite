@@ -3,6 +3,9 @@ SET SERVEROUTPUT ON;
 
 -- HR OPS AUTOMATION SUITE VPD's
 
+-- Milestone J
+
+-- J2
 CREATE OR REPLACE FUNCTION fn_vpd_salary_policy (
     p_schema IN VARCHAR2,
     p_object IN VARCHAR2

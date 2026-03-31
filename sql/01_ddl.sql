@@ -162,6 +162,9 @@ CREATE INDEX idx_transfers_emp ON cs_transfers(emp_id);
 
 -- Roles
 
+-- Milestone J
+
+-- J1
 -- HR ADMIN
 CREATE ROLE role_hr_admin;
 GRANT SELECT, INSERT, UPDATE, DELETE ON cs_employee_salary TO role_hr_admin;

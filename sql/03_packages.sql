@@ -145,6 +145,7 @@ IS
     );
 
     PROCEDURE pr_generate_payroll(p_month IN DATE);
+    PROCEDURE pr_generate_payroll_bulk (p_month IN DATE);
 
     PROCEDURE pr_transfer_employee(
         p_emp_id IN cs_employees.emp_id%TYPE,
@@ -368,6 +369,90 @@ IS
             );
             RAISE;
     END;
+
+    PROCEDURE pr_generate_payroll_bulk (
+        p_month IN DATE
+    )
+    IS
+        TYPE t_emp_rec IS RECORD (
+            emp_id      cs_employees.emp_id%TYPE,
+            base_salary cs_employee_salary.base_salary%TYPE,
+            bonus       cs_employee_salary.bonus%TYPE
+        );
+
+        TYPE t_emp_tab IS TABLE OF t_emp_rec;
+        v_emp_tab t_emp_tab;
+
+        TYPE t_failed_tab IS TABLE OF NUMBER INDEX BY PLS_INTEGER;
+        v_failed t_failed_tab;
+        v_fail_count NUMBER := 0;
+
+        v_month DATE := TRUNC(p_month, 'MM');
+
+    BEGIN
+        SELECT e.emp_id,
+            s.base_salary,
+            NVL(s.bonus,0)
+        BULK COLLECT INTO v_emp_tab
+        FROM cs_employees e
+        JOIN cs_employee_salary s
+        ON e.emp_id = s.emp_id;
+
+        FORALL i IN 1 .. v_emp_tab.COUNT SAVE EXCEPTIONS
+            INSERT INTO cs_payroll_snapshot (
+                snap_month,
+                emp_id,
+                gross_pay,
+                tax_amount,
+                net_pay
+            )
+            VALUES (
+                v_month,
+                v_emp_tab(i).emp_id,
+                v_emp_tab(i).base_salary + v_emp_tab(i).bonus,
+                FN_COMPUTE_TAX(
+                    v_emp_tab(i).base_salary + v_emp_tab(i).bonus
+                ),
+                (v_emp_tab(i).base_salary + v_emp_tab(i).bonus)
+                - FN_COMPUTE_TAX(
+                    v_emp_tab(i).base_salary + v_emp_tab(i).bonus
+                )
+            );
+
+        DBMS_OUTPUT.PUT_LINE('Processed rows: ' || v_emp_tab.COUNT);
+
+    EXCEPTION
+        WHEN OTHERS THEN
+            IF SQLCODE = -24381 THEN
+                FOR i IN 1 .. SQL%BULK_EXCEPTIONS.COUNT LOOP
+                    v_fail_count := v_fail_count + 1;
+                    v_failed(v_fail_count) :=
+                        v_emp_tab(SQL%BULK_EXCEPTIONS(i).ERROR_INDEX).emp_id;
+                END LOOP;
+
+                DBMS_OUTPUT.PUT_LINE('Failures: ' || v_fail_count);
+
+                IF v_fail_count > 0 THEN
+                    DBMS_OUTPUT.PUT_LINE('Failed employees:');
+                    FOR i IN 1 .. v_fail_count LOOP
+                        DBMS_OUTPUT.PUT_LINE(
+                            v_failed(i) || ' - ' ||
+                            FN_GET_EMP_FULLNAME(v_failed(i))
+                        );
+                    END LOOP;
+                END IF;
+
+            END IF;
+
+            pkg_error.pr_log_error(
+                'pr_generate_payroll_bulk',
+                TO_CHAR(p_month),
+                SQLCODE,
+                SQLERRM
+            );
+
+            RAISE;
+    END;    
 
 
     PROCEDURE pr_transfer_employee(

@@ -63,3 +63,51 @@ BEGIN
 END;
 /
 
+-- Comparing Payroll Snapshot using Cursor and Bulk Insert
+
+BEGIN
+    hr_ops.pkg_hr_security.pr_set_login_context;
+END;
+/
+
+SET SERVEROUTPUT ON
+SET TIMING ON
+/
+
+PROMPT ==========================================
+PROMPT ROW-BY-ROW CURSOR VERSION (June)
+PROMPT ==========================================
+/
+
+BEGIN
+    DELETE FROM cs_payroll_snapshot
+    WHERE snap_month = DATE '2026-06-01';
+    COMMIT;
+END;
+/
+
+BEGIN
+    pkg_hr_ops.pr_generate_payroll(
+    p_month => DATE '2026-06-01'
+    );
+END;
+/
+
+PROMPT ==========================================
+PROMPT BULK COLLECT + FORALL VERSION (June)
+PROMPT ==========================================
+/
+
+BEGIN
+    DELETE FROM cs_payroll_snapshot
+    WHERE snap_month = DATE '2026-06-01';
+    COMMIT;
+END;
+/
+
+BEGIN
+    pkg_hr_ops.pr_generate_payroll_bulk(
+    p_month => DATE '2026-06-01'
+    );
+END;
+/
