@@ -163,6 +163,6 @@ END tr_cs_employee_salary_au;
 CREATE OR REPLACE TRIGGER trg_hr_login_ctx
 AFTER LOGON ON DATABASE
 BEGIN
-  pkg_hr_security.set_login_context;
+  pkg_hr_security.pr_set_login_context;
 END;
 /
