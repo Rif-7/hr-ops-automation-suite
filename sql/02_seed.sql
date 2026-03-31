@@ -78,4 +78,86 @@ BEGIN
 END;
 /
 
+-- Insert user rows
+DECLARE
+    v_man_id cs_employees.emp_id%TYPE;
+    v_emp_id cs_employees.emp_id%TYPE;
+BEGIN
+
+    INSERT INTO cs_user_identity (db_username) VALUES('HR_OPS');
+
+    -- Inserting Manager
+    INSERT INTO cs_employees (
+        first_name,
+        last_name,
+        email,
+        phone,
+        dept_id,
+        job_title,
+        manager_id
+    ) VALUES (
+        'Pep',
+        'Guardiola',
+        'pep@mcfc.com',
+        '4444444444',
+        1,
+        'Manager',
+        null
+    ) RETURNING emp_id INTO v_man_id;
+
+    INSERT INTO cs_user_identity (
+        db_username,
+        emp_id
+    ) VALUES (
+        'manager_pep',
+        v_man_id
+    );
+
+    INSERT INTO cs_employee_salary (
+        emp_id,
+        base_salary
+    ) VALUES (
+        v_man_id,
+        80000
+    );
+
+
+    INSERT INTO cs_employees (
+        first_name,
+        last_name,
+        email,
+        phone,
+        dept_id,
+        job_title,
+        manager_id
+    ) VALUES (
+        'Kevin',
+        'De Bruyne',
+        'kdb@mcfc.com',
+        '1717171717',
+        1,
+        'Senior Engineer',
+        v_man_id
+    ) RETURNING emp_id INTO v_emp_id;
+
+    INSERT INTO cs_user_identity (
+        db_username,
+        emp_id
+    ) VALUES (
+        'employee_kevin',
+        v_emp_id
+    );
+
+    INSERT INTO cs_employee_salary (
+        emp_id,
+        base_salary
+    ) VALUES (
+        v_emp_id,
+        70000
+    );
+
+END;
+/
+
 COMMIT;
+/

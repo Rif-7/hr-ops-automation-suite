@@ -711,7 +711,6 @@ END pkg_hr_security;
 /
 
 CREATE OR REPLACE PACKAGE BODY pkg_hr_security
-AUTHID DEFINER
 IS
     PROCEDURE pr_set_login_context
     IS
@@ -725,7 +724,7 @@ IS
         IF DBMS_SESSION.IS_ROLE_ENABLED('ROLE_HR_ADMIN') THEN
             l_role := 'HR_ADMIN';
         ELSIF DBMS_SESSION.IS_ROLE_ENABLED('ROLE_MANAGER') THEN
-            l_role := 'HR_MANAGER';
+            l_role := 'MANAGER';
         ELSE
             l_role := 'EMPLOYEE';
         END IF;
@@ -737,7 +736,10 @@ IS
 
     EXCEPTION 
         WHEN NO_DATA_FOUND THEN
-            DBMS_SESSION.SET_CONTEXT('HR_CTX', 'ROLE_TYPE', 'NONE');
+            DBMS_SESSION.SET_CONTEXT('HR_CTX', 'ROLE_TYPE', 'NONE'); 
+        WHEN OTHERS THEN
+            DBMS_OUTPUT.PUT_LINE(SQLCODE);
+            DBMS_OUTPUT.PUT_LINE(SQLERRM);
     END;
 END pkg_hr_security;
 /

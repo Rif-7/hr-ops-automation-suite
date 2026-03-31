@@ -21,7 +21,7 @@ BEGIN
              SELECT emp_id
              FROM cs_employees
              WHERE manager_id = ' || l_emp_id || '
-         )';
+         ) OR emp_id = ' || l_emp_id;
 
     ELSIF l_role = 'EMPLOYEE' THEN
         RETURN 'emp_id = ' || l_emp_id;
