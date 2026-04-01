@@ -1,5 +1,5 @@
 SET SERVEROUTPUT ON
-
+/
 -- HR OPS AUTOMATION SUITE Tests
 
 BEGIN
@@ -10,6 +10,12 @@ END;
 -- Milestone A
 
 -- A1
+
+PROMPT ==========================================
+PROMPT Milestone: A1 - Ensure Department Exists (Engineering)
+PROMPT ==========================================
+
+
 DECLARE
     v_dept_name   cs_departments.dept_name%TYPE := 'Engineering';
     v_dept_id     cs_departments.dept_id%TYPE;
@@ -35,9 +41,14 @@ EXCEPTION
     WHEN OTHERS THEN
         DBMS_OUTPUT.PUT_LINE('Error: ' || SQLERRM);
 END;
-
+/
 
 -- A2
+
+PROMPT ==========================================
+PROMPT Milestone A: A2 - Salary Band Classification
+PROMPT ==========================================
+
 DECLARE
     v_band_a NUMBER := 0;
     v_band_b NUMBER := 0;
@@ -74,9 +85,8 @@ END;
 PROMPT ==========================================
 PROMPT TEST: pr_onboard_employee (SUCCESS)
 PROMPT ==========================================
-/
 
-SET SERVEROUTPUT ON
+
 /
 
 DECLARE
@@ -128,6 +138,60 @@ BEGIN
 END;
 /
 
+
+SELECT *
+FROM cs_audit_log
+WHERE table_name = 'pr_onboard_employee'
+ORDER BY changed_at DESC;
+
+/
+PROMPT ==========================================
+PROMPT TEST: pr_onboard_employee (INVALID Department ID)
+PROMPT ==========================================
+
+BEGIN
+    pkg_hr_ops.pr_onboard_employee(
+        p_first_name => 'Bad',
+        p_last_name  => 'Dep',
+        p_email      => 'baddep@company.com',
+        p_phone      => '1111111111',
+        p_dept_id    => 9000,
+        p_job_title  => 'Associate',
+        p_manager_id => 2,
+        p_salary     => 40000
+    );
+END;
+/
+
+
+
+SELECT *
+FROM cs_audit_log
+WHERE table_name = 'pr_onboard_employee'
+ORDER BY changed_at DESC;
+/
+
+
+PROMPT ==========================================
+PROMPT TEST: pr_onboard_employee (INVALID Salary)
+PROMPT ==========================================
+
+BEGIN
+    pkg_hr_ops.pr_onboard_employee(
+        p_first_name => 'Bad',
+        p_last_name  => 'Dep',
+        p_email      => 'baddep@company.com',
+        p_phone      => '1111111111',
+        p_dept_id    => 1,
+        p_job_title  => 'Associate',
+        p_manager_id => 2,
+        p_salary     => -2000
+    );
+END;
+/
+
+
+
 SELECT *
 FROM cs_audit_log
 WHERE table_name = 'pr_onboard_employee'
@@ -139,10 +203,7 @@ ORDER BY changed_at DESC;
 PROMPT ==========================================
 PROMPT TEST: pr_transfer_employee
 PROMPT ==========================================
-/
 
-SET SERVEROUTPUT ON
-/
 
 SELECT emp_id, dept_id FROM cs_employees WHERE emp_id = 1;
 /
@@ -167,7 +228,6 @@ ORDER BY created_at DESC;
 PROMPT ==========================================
 PROMPT TEST: pr_transfer_employee (INVALID DEPT)
 PROMPT ==========================================
-/
 
 BEGIN
     pkg_hr_ops.pr_transfer_employee(
@@ -190,7 +250,7 @@ ORDER BY changed_at DESC;
 PROMPT ==========================================
 PROMPT TEST: pr_upload_doc
 PROMPT ==========================================
-/
+
 
 DECLARE
     v_blob BLOB;
@@ -226,9 +286,8 @@ ORDER BY uploaded_at DESC;
 PROMPT ==========================================
 PROMPT TEST: fn_employee_summary
 PROMPT ==========================================
-/
 
-SET SERVEROUTPUT ON
+
 /
 
 DECLARE
@@ -244,7 +303,7 @@ END;
 PROMPT ==========================================
 PROMPT TEST: pr_employee_report
 PROMPT ==========================================
-/
+
 
 VARIABLE rc REFCURSOR;
 
@@ -265,7 +324,6 @@ PRINT rc;
 PROMPT ==========================================
 PROMPT TEST: pr_employee_report (INVALID COLUMN)
 PROMPT ==========================================
-/
 
 VARIABLE rc REFCURSOR;
 
@@ -303,7 +361,6 @@ SELECT pkg_hr_ops.fn_get_doc_metadata(
 PROMPT ==========================================
 PROMPT TEST: fn_get_doc_blob_summary
 PROMPT ==========================================
-/
 
 SELECT pkg_hr_ops.fn_get_doc_blob_summary(
     (SELECT MAX(doc_id) FROM cs_employee_docs)
@@ -369,7 +426,6 @@ BEGIN
 END;
 /
 
-SET SERVEROUTPUT ON
 SET TIMING ON
 /
 
