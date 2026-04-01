@@ -88,3 +88,25 @@ The `06_tests.sql` file includes comprehensive tests for procedures, functions, 
 4. Check `cs_audit_log` for logged events.
 
 Ensure all prior files are compiled before running tests to avoid dependency errors.
+
+
+
+## Screenshots
+
+![](./screenshots/Departments_Table.png)
+Departments Table
+
+![](./screenshots/Employee_Payroll_Snapshot_Table.png)
+Payroll Snapshots Table
+
+![](./screenshots/Audit_Log_Errors.png)
+Audit Log Table - Errors View
+
+![](./screenshots/Audit_Log_Table_Updates.png)
+Audit Log Table - Updates View
+
+![](./screenshots/User_Identity_Table.png)
+
+User Identity Table
+
+
